@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import Card from '../shared/Card.tsx';
-import { User } from '../../types.ts';
-import { updateUserProfile, changePassword } from '../../services/mockDataService.ts';
-import { UserIcon } from '../shared/Icons.tsx';
+import React, { useState, useEffect } from 'react';
+import { User } from '../../types';
+import { auth } from '../../src/firebase';
+import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
+import Card from '../shared/Card';
+import { UserIcon } from '../shared/Icons';
 
 interface UserProfileProps {
     user: User;
@@ -39,6 +40,10 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
+    useEffect(() => {
+        setFormData({ name: user.name, email: user.email });
+    }, [user]);
+
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
         setFormData(prev => ({ ...prev, [id]: value }));
@@ -58,7 +63,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser }) => {
         e.preventDefault();
         setIsLoading(true);
         try {
-            const updatedUser = await updateUserProfile(user.id, formData);
+            const updatedUser = { ...user, ...formData };
             onUpdateUser(updatedUser);
             showNotification('success', 'Profile updated successfully!');
             setIsEditing(false);
@@ -75,22 +80,32 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser }) => {
             showNotification('error', 'New passwords do not match.');
             return;
         }
-        if (passwordData.newPassword.length < 8) {
-             showNotification('error', 'Password must be at least 8 characters long.');
+        if (passwordData.newPassword.length < 6) {
+             showNotification('error', 'Password must be at least 6 characters long.');
             return;
         }
 
         setIsLoading(true);
+        const currentUser = auth.currentUser;
+        if (!currentUser || !currentUser.email) {
+            showNotification('error', 'User not found. Please log in again.');
+            setIsLoading(false);
+            return;
+        }
+
         try {
-            const result = await changePassword(user.id, passwordData.currentPassword, passwordData.newPassword);
-            if (result.success) {
-                showNotification('success', result.message);
-                setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+            const credential = EmailAuthProvider.credential(currentUser.email, passwordData.currentPassword);
+            await reauthenticateWithCredential(currentUser, credential);
+            await updatePassword(currentUser, passwordData.newPassword);
+            
+            showNotification('success', 'Password changed successfully!');
+            setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+        } catch (error: any) {
+            if (error.code === 'auth/wrong-password') {
+                showNotification('error', 'Incorrect current password.');
             } else {
-                 showNotification('error', result.message);
+                showNotification('error', 'Failed to change password. Please try again.');
             }
-        } catch (error) {
-            showNotification('error', 'Failed to change password.');
         } finally {
             setIsLoading(false);
         }
@@ -128,7 +143,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser }) => {
                 </div>
                 <form onSubmit={handleProfileSave} className="space-y-4">
                     <ProfileInput label="Full Name" id="name" value={formData.name} onChange={handleInputChange} disabled={!isEditing || isLoading} />
-                    <ProfileInput label="Email Address" id="email" value={formData.email} onChange={handleInputChange} type="email" disabled={!isEditing || isLoading} />
+                    <ProfileInput label="Email Address" id="email" value={formData.email} onChange={handleInputChange} type="email" disabled={true} />
                     {isEditing && (
                         <div className="flex justify-end gap-3 pt-4">
                              <button type="button" onClick={handleCancelEdit} disabled={isLoading} className="bg-surface border border-border-color text-white font-bold py-2 px-4 rounded-md text-sm hover:bg-border-color transition-colors">
