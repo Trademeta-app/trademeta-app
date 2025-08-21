@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import DepositRequests from './admin/DepositRequests.tsx';
+import { User } from '../types.ts';
+import { adminGetAllUsers, adminAddHolding } from '../services/firebaseService.ts';
 import UserTable from './admin/UserTable.tsx';
 import UserManagementDetail from './admin/UserManagementDetail.tsx';
-import { User } from '../types.ts';
 import Card from './shared/Card.tsx';
+import DepositRequests from './admin/DepositRequests.tsx';
 
 interface AdminPanelProps {
     currentUser: User | null;
@@ -26,12 +27,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onUserUpdate }) =>
 
     useEffect(() => {
         const fetchUsers = async () => {
+            console.log("[AdminPanel] useEffect tetiklendi, kullanıcılar çekiliyor...");
             setIsLoading(true);
             try {
-                const allUsers = await getAdminAllUsers();
+                const allUsers = await adminGetAllUsers();
+                console.log("[AdminPanel] adminGetAllUsers'dan dönen veri:", allUsers);
                 setUsers(allUsers);
             } catch (error) {
-                console.error("Failed to fetch users for admin panel", error);
+                console.error("Admin paneli için kullanıcılar çekilirken hata oluştu:", error);
             } finally {
                 setIsLoading(false);
             }
@@ -59,7 +62,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onUserUpdate }) =>
             }
             return updatedUser;
         } catch (error) {
-            console.error("Admin adjustment failed in AdminPanel:", error);
+            console.error("AdminPanel'de admin ayarlaması başarısız oldu:", error);
             throw error;
         }
     };
