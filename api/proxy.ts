@@ -33,7 +33,6 @@ export default async function handler(
     });
 
     // --- ADIM 3: CoinGecko'dan gelen cevabın tamamını logla (EN ÖNEMLİ KISIM) ---
-    // JSON.stringify kullanarak objenin içeriğini de görebiliriz.
     console.log("<-- Received successful response from CoinGecko. Status:", response.status);
     console.log("<-- Data received:", JSON.stringify(response.data, null, 2));
 
