@@ -24,14 +24,10 @@ export default async function handler(
       }
     });
 
-    // GELEN VERİYİ KONTROL ETME (EN ÖNEMLİ KISIM)
-    if (!response.data || (Array.isArray(response.data) && response.data.length === 0)) {
-        // CoinGecko boş ama başarılı bir cevap döndürürse, bunu bir sunucu hatası olarak logla
-        console.warn(`CoinGecko returned an empty but successful response for endpoint: ${endpoint}`);
-        // İstemciye yine de boş dizi gönderilebilir, ama loglama önemlidir.
-    }
+    // ÖNBELLEĞİ DEVRE DIŞI BIRAKMA (EN ÖNEMLİ KISIM)
+    // Bu başlık, hem Vercel'in Edge Cache'ine hem de tarayıcıya bu yanıtı saklamamasını söyler.
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     
-    res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
     res.status(200).json(response.data);
 
   } catch (error: any) {
