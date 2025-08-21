@@ -1,7 +1,19 @@
 import axios from 'axios';
 import { Coin, CoinDetail, PriceDataPoint } from '../types'; 
 
-const API_PROXY_ENDPOINT = '/api/proxy';
+// Canlı ve geliştirme ortamları için API adresini dinamik olarak belirle
+const getApiBaseUrl = () => {
+  // Bu kod, Vercel'de (veya Netlify'da) çalıştığında,
+  // Vercel tarafından otomatik olarak ayarlanan bir ortam değişkenidir.
+  if (process.env.VERCEL_URL) {
+    // Canlı ortamda, kendi sitemizin tam URL'sini kullanmalıyız.
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  // Yerelde 'vercel dev' ile çalışırken, göreceli yol yeterlidir.
+  return '';
+};
+
+const API_PROXY_ENDPOINT = `${getApiBaseUrl()}/api/proxy`;
 
 export const getMarketData = async (currency: string = 'usd', perPage: number = 100): Promise<Coin[]> => {
   try {
