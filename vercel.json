@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/proxy.ts",
+      "src": "api/**/*.ts",
       "use": "@vercel/node"
     },
     {
@@ -15,8 +15,11 @@
   ],
   "routes": [
     {
-      "src": "/api/proxy",
-      "dest": "/api/proxy.ts"
+      "src": "/api/(.*)",
+      "dest": "/api/proxy"
+    },
+    {
+      "handle": "filesystem"
     },
     {
       "src": "/(.*)",
