@@ -1,13 +1,13 @@
 import React from 'react';
 import { User } from '../../types';
-import Card from '../shared/Card'; // <-- EKSİK OLAN SATIR BUYDU
+import Card from '../shared/Card';
 
 interface UserTableProps {
     users: User[];
     onSelectUser: (user: User) => void;
 }
 
-const UserTable: React.FC<UserTable.tsxProps> = ({ users, onSelectUser }) => {
+const UserTable: React.FC<UserTableProps> = ({ users, onSelectUser }) => {
     return (
         <Card>
             <div className="p-6">
@@ -26,10 +26,15 @@ const UserTable: React.FC<UserTable.tsxProps> = ({ users, onSelectUser }) => {
                         <tbody>
                             {users.map((user) => (
                                 <tr key={user.id} className="border-b border-border-color last:border-0 hover:bg-surface/50">
-                                    <td className="p-3 text-white">{user.name}</td>
-                                    <td className="p-3 text-white">{user.email}</td>
-                                    <td className="p-3 text-right font-mono text-white">${user.balance.toFixed(2)}</td>
-                                    <td className="p-3 text-right font-mono text-white">{user.holdings.length}</td>
+                                    <td className="p-3 text-white">{user.name || 'N/A'}</td>
+                                    <td className="p-3 text-white">{user.email || 'N/A'}</td>
+                                    {/* GÜVENLİK KONTROLÜ EKLENDİ */}
+                                    <td className="p-3 text-right font-mono text-white">
+                                        {typeof user.balance === 'number' ? `$${user.balance.toFixed(2)}` : '$-'}
+                                    </td>
+                                    <td className="p-3 text-right font-mono text-white">
+                                        {Array.isArray(user.holdings) ? user.holdings.length : 0}
+                                    </td>
                                     <td className="p-3 text-center">
                                         <button
                                             onClick={() => onSelectUser(user)}
