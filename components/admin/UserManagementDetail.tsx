@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { User, TransactionType } from '../../types.ts';
-import { adminUpdateUser, adminChangePassword, adminAdjustBalance, adminDeleteTransaction } from '../../services/mockDataService.ts';
+import { User, Transaction, TransactionType } from '../../types.ts';
+import { adminUpdateUserProfile, adminAdjustBalance, adminDeleteTransaction } from '../../services/firebaseService.ts';
 import Card from '../shared/Card.tsx';
 
 interface UserManagementDetailProps {
     user: User;
     onBack: () => void;
     onAdminAdjustment: (userId: string, adjustment: { coinSymbol: string, amount: number, targetAddress: string }) => Promise<User | void>;
-    onUserUpdate: (updatedUser: User) => void; // State'i senkronize tutmak için
+    onUserUpdate: (updatedUser: User) => void;
 }
 
 const AddToPortfolioForm: React.FC<{ 
@@ -87,7 +87,7 @@ const UserManagementDetail: React.FC<UserManagementDetailProps> = ({ user, onBac
         e.preventDefault();
         setIsLoading(true);
         try {
-            const updatedUser = await adminUpdateUser(user.id, profileData);
+            const updatedUser = await adminUpdateUserProfile(user.id, profileData);
             onUserUpdate(updatedUser);
             showNotification('success', "User profile updated successfully.");
         } catch (error) {
@@ -99,20 +99,7 @@ const UserManagementDetail: React.FC<UserManagementDetailProps> = ({ user, onBac
 
     const handlePasswordChange = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (newPassword.length < 6) {
-            showNotification('error', "Password must be at least 6 characters long.");
-            return;
-        }
-        setIsLoading(true);
-        try {
-            await adminChangePassword(user.id, newPassword);
-            setNewPassword('');
-            showNotification('success', "User password has been changed.");
-        } catch (error) {
-            showNotification('error', "Failed to change password.");
-        } finally {
-            setIsLoading(false);
-        }
+        showNotification('error', "Şifre değiştirme şu anda mock servislerde desteklenmiyor.");
     };
 
     const handleBalanceAdjust = async (e: React.FormEvent) => {
@@ -135,13 +122,13 @@ const UserManagementDetail: React.FC<UserManagementDetailProps> = ({ user, onBac
         }
     };
 
-    const handleDeleteTransaction = async (txId: string) => {
+    const handleDeleteTransaction = async (tx: Transaction) => {
         if (!window.confirm("Are you sure you want to delete this transaction? This action cannot be undone.")) {
             return;
         }
         setIsLoading(true);
         try {
-            const updatedUser = await adminDeleteTransaction(user.id, txId);
+            const updatedUser = await adminDeleteTransaction(user.id, tx);
             onUserUpdate(updatedUser);
             showNotification('success', 'Transaction deleted successfully.');
         } catch (error) {
@@ -201,9 +188,9 @@ const UserManagementDetail: React.FC<UserManagementDetailProps> = ({ user, onBac
                          <form onSubmit={handlePasswordChange} className="space-y-4">
                             <div>
                                 <label className="block text-sm text-muted mb-1">New Password</label>
-                                <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full bg-background border border-border-color rounded px-3 py-2" placeholder="Enter new password"/>
+                                <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full bg-background border border-border-color rounded px-3 py-2" placeholder="Not implemented"/>
                             </div>
-                             <button type="submit" disabled={isLoading} className="w-full bg-primary text-background font-bold py-2 rounded-md hover:bg-primary-focus">Set New Password</button>
+                             <button type="submit" disabled={true} className="w-full bg-primary text-background font-bold py-2 rounded-md hover:bg-primary-focus opacity-50 cursor-not-allowed">Set New Password</button>
                         </form>
                     </Card>
 
@@ -238,7 +225,7 @@ const UserManagementDetail: React.FC<UserManagementDetailProps> = ({ user, onBac
                         <h2 className="text-xl font-bold text-white mb-4">Transaction History</h2>
                          <div className="overflow-y-auto max-h-96">
                              <table className="w-full text-left text-xs">
-                                <thead><tr className="border-b border-border-color"><th className="p-1 text-muted">Date</th><th className="p-1 text-muted">Type</th><th className="p-1 text-muted">Asset</th><th className="p-1 text-muted text-right">Amount</th><th className="p-1 text-muted text-right">Actions</th></tr></thead>
+                                <thead><tr className="border-b border-border-color"><th className="p-1 text-muted">Date</th><th className="p-1 text-muted">Type</th><th className="p-1 text-muted">Asset</th><th className="p-1 text-muted text-right">Amount (USD)</th><th className="p-1 text-muted text-right">Actions</th></tr></thead>
                                 <tbody>
                                     {user.transactions.map(tx => <tr key={tx.id} className="border-b border-border-color last:border-0 hover:bg-surface/50">
                                         <td className="p-1.5 text-muted">{new Date(tx.date).toLocaleString()}</td>
@@ -246,7 +233,7 @@ const UserManagementDetail: React.FC<UserManagementDetailProps> = ({ user, onBac
                                         <td className="p-1.5 text-white">{tx.asset}</td>
                                         <td className="p-1.5 text-right font-mono text-white">${tx.amountUsd.toFixed(2)}</td>
                                         <td className="p-1.5 text-right">
-                                            <button onClick={() => handleDeleteTransaction(tx.id)} className="text-danger hover:underline">Delete</button>
+                                            <button onClick={() => handleDeleteTransaction(tx)} className="text-danger hover:underline">Delete</button>
                                         </td>
                                     </tr>)}
                                     {user.transactions.length === 0 && <tr><td colSpan={5} className="text-center p-4 text-muted">No transactions</td></tr>}

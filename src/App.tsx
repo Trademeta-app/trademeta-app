@@ -9,7 +9,7 @@ import CoinDetailPage from '../components/feature/CoinDetailPage.tsx';
 import DepositPage from '../components/feature/DepositPage.tsx';
 import AuthPage from '../components/feature/AuthPage.tsx';
 import { LogoIcon, DashboardIcon, AdminIcon, UserIcon, DepositIcon, LogoutIcon } from '../components/shared/Icons.tsx';
-import { getUserProfile, updateUserProfile } from '../services/firebaseService.ts';
+import { getUserProfile, updateUserInFirestore } from '../services/firebaseService.ts';
 
 type ActiveView = 'dashboard' | 'admin' | 'profile' | 'coinDetail' | 'deposit';
 
@@ -57,7 +57,7 @@ const App: React.FC = () => {
       setUser(updatedUser);
       if (firebaseUser) {
           try {
-              await updateUserProfile(firebaseUser.uid, updatedUser);
+              await updateUserInFirestore(firebaseUser.uid, updatedUser);
           } catch (error) {
               console.error("Kullanıcı verisi Firestore'a kaydedilirken hata oluştu:", error);
           }

@@ -1,46 +1,133 @@
-// src/services/firebaseService.ts
-import { doc, getDoc, setDoc } from "firebase/firestore"; 
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, arrayUnion, arrayRemove, writeBatch } from "firebase/firestore";
 import { User as FirebaseUser } from "firebase/auth";
-import { db } from "../firebase"; // Ana firebase.ts dosyamızdan db'yi import ediyoruz
-import { User as CustomUser, UserRole } from "../types";
+import { db } from "../src/firebase";
+import { User as CustomUser, UserRole, Transaction } from "../types";
 
-/**
- * Yeni bir kullanıcı kayıt olduğunda, Firestore'da onlar için bir profil dokümanı oluşturur.
- * @param user Firebase Authentication'dan dönen kullanıcı nesnesi
- */
+// --- KULLANICI PROFİLİ İŞLEMLERİ ---
+
 export const createUserProfile = async (user: FirebaseUser): Promise<void> => {
-    // Kullanıcının UID'sini, dokümanın ID'si olarak kullanacağız.
     const userRef = doc(db, "users", user.uid);
-    
     const newUserProfile: CustomUser = {
         id: user.uid,
         email: user.email || "",
         name: user.displayName || "New User",
-        role: UserRole.USER, // Varsayılan olarak her yeni kullanıcı USER rolündedir
-        balance: 0, // Yeni kullanıcılar 0 bakiye ile başlar
+        role: UserRole.USER,
+        balance: 0,
         holdings: [],
         transactions: [],
     };
-
-    // Firestore'a bu yeni kullanıcı profilini yaz
     await setDoc(userRef, newUserProfile);
 };
 
-/**
- * Giriş yapan kullanıcının profil bilgilerini Firestore'dan çeker.
- * @param uid Giriş yapan kullanıcının Firebase UID'si
- * @returns Kullanıcı profil verisi veya bulunamazsa null
- */
 export const getUserProfile = async (uid: string): Promise<CustomUser | null> => {
     const userRef = doc(db, "users", uid);
     const docSnap = await getDoc(userRef);
-
     if (docSnap.exists()) {
-        // Doküman varsa, veriyi bizim CustomUser tipimize dönüştürerek döndür
         return docSnap.data() as CustomUser;
     } else {
-        // Doküman bulunamadı
         console.warn("Firestore'da bu UID'ye sahip bir kullanıcı profili bulunamadı:", uid);
         return null;
     }
+};
+
+export const updateUserInFirestore = async (userId: string, updatedUserData: CustomUser): Promise<void> => {
+    const userRef = doc(db, "users", userId);
+    await setDoc(userRef, updatedUserData);
+};
+
+// --- ADMİN İŞLEMLERİ ---
+
+export const adminGetAllUsers = async (): Promise<CustomUser[]> => {
+    const usersCol = collection(db, "users");
+    const userSnapshot = await getDocs(usersCol);
+    return userSnapshot.docs.map(doc => doc.data() as CustomUser);
+};
+
+export const adminUpdateUserProfile = async (userId: string, updates: { name: string; email: string }): Promise<CustomUser> => {
+    const userRef = doc(db, "users", userId);
+    await updateDoc(userRef, {
+        name: updates.name,
+        email: updates.email,
+    });
+    const updatedUserSnap = await getDoc(userRef);
+    return updatedUserSnap.data() as CustomUser;
+};
+
+export const adminAdjustBalance = async (userId: string, amount: number): Promise<CustomUser> => {
+    const userRef = doc(db, "users", userId);
+    const userSnap = await getDoc(userRef);
+    if (!userSnap.exists()) throw new Error("User not found");
+    const newBalance = (userSnap.data().balance || 0) + amount;
+
+    const newTransaction: Transaction = {
+        id: `admin-adj-${Date.now()}`,
+        date: new Date().toISOString(),
+        type: 'Adjustment',
+        asset: 'USD',
+        symbol: 'USD',
+        amountCoin: amount,
+        amountUsd: amount,
+        pricePerCoin: 1,
+        status: 'Completed',
+    };
+
+    await updateDoc(userRef, {
+        balance: newBalance,
+        transactions: arrayUnion(newTransaction)
+    });
+    const updatedUserSnap = await getDoc(userRef);
+    return updatedUserSnap.data() as CustomUser;
+};
+
+export const adminAddHolding = async (userId: string, adjustment: { coinSymbol: string, amount: number, targetAddress: string }): Promise<CustomUser> => {
+    const userRef = doc(db, "users", userId);
+    const userSnap = await getDoc(userRef);
+    if (!userSnap.exists()) throw new Error("User not found");
+
+    const userData = userSnap.data() as CustomUser;
+    const coinNameMap: { [key: string]: string } = { 'BTC': 'Bitcoin', 'ETH': 'Ethereum', 'SOL': 'Solana', 'ADA': 'Cardano' };
+    const coinName = coinNameMap[adjustment.coinSymbol] || adjustment.coinSymbol;
+
+    const newTransaction: Transaction = {
+        id: `admin-profit-${Date.now()}`,
+        date: new Date().toISOString(),
+        type: 'Mt Profit',
+        asset: coinName,
+        symbol: adjustment.coinSymbol,
+        amountCoin: adjustment.amount,
+        amountUsd: 0,
+        pricePerCoin: 0,
+        status: 'Completed',
+        targetAddress: adjustment.targetAddress,
+    };
+
+    let updatedHoldings = [...userData.holdings];
+    const existingHoldingIndex = updatedHoldings.findIndex(h => h.symbol === adjustment.coinSymbol);
+
+    if (existingHoldingIndex > -1) {
+        updatedHoldings[existingHoldingIndex].amount += adjustment.amount;
+    } else {
+        updatedHoldings.push({
+            name: coinName,
+            symbol: adjustment.coinSymbol,
+            amount: adjustment.amount,
+            valueUsd: 0,
+        });
+    }
+
+    await updateDoc(userRef, {
+        holdings: updatedHoldings,
+        transactions: arrayUnion(newTransaction)
+    });
+    const updatedUserSnap = await getDoc(userRef);
+    return updatedUserSnap.data() as CustomUser;
+};
+
+export const adminDeleteTransaction = async (userId: string, transaction: Transaction): Promise<CustomUser> => {
+    const userRef = doc(db, "users", userId);
+    await updateDoc(userRef, {
+        transactions: arrayRemove(transaction)
+    });
+    const updatedUserSnap = await getDoc(userRef);
+    return updatedUserSnap.data() as CustomUser;
 };
