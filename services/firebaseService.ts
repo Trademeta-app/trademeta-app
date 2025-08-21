@@ -1,14 +1,18 @@
-// src/services/firebaseService.ts
 import { collection, doc, addDoc, getDoc, getDocs, setDoc, updateDoc, arrayUnion, arrayRemove, writeBatch } from "firebase/firestore";
 import { User as FirebaseUser } from "firebase/auth";
 import { db } from "../src/firebase";
 import { User as CustomUser, UserRole, Transaction, DepositRequest } from "../types";
 
-// --- KULLANICI PROFİLİ İŞLEMLERİ ---
 export const createUserProfile = async (user: FirebaseUser): Promise<void> => {
     const userRef = doc(db, "users", user.uid);
     const newUserProfile: CustomUser = {
-        id: user.uid, email: user.email || "", name: user.displayName || "New User", role: UserRole.USER, balance: 0, holdings: [], transactions: [],
+        id: user.uid,
+        email: user.email || "",
+        name: user.displayName || "New User",
+        role: UserRole.USER,
+        balance: 0,
+        holdings: [],
+        transactions: [],
     };
     await setDoc(userRef, newUserProfile);
 };
@@ -29,20 +33,31 @@ export const updateUserInFirestore = async (userId: string, updatedUserData: Cus
     await setDoc(userRef, updatedUserData);
 };
 
-// --- YATIRIM TALEP İŞLEMLERİ (KULLANICI) ---
 export const createDepositRequestInFirestore = async (userId: string, userName: string, amount: number, method: string): Promise<void> => {
     const requestsCollection = collection(db, "depositRequests");
     const newRequest = {
-        userId: userId, userName: userName, amount: amount, method: method, status: 'Pending', date: new Date().toISOString(),
+        userId: userId,
+        userName: userName,
+        amount: amount,
+        method: method,
+        status: 'Pending',
+        date: new Date().toISOString(),
     };
     await addDoc(requestsCollection, newRequest);
 };
 
-// --- ADMİN İŞLEMLERİ ---
 export const adminGetAllUsers = async (): Promise<CustomUser[]> => {
-    const usersCol = collection(db, "users");
-    const userSnapshot = await getDocs(usersCol);
-    return userSnapshot.docs.map(doc => doc.data() as CustomUser);
+    console.log("[firebaseService] adminGetAllUsers fonksiyonu çağrıldı.");
+    try {
+        const usersCol = collection(db, "users");
+        const userSnapshot = await getDocs(usersCol);
+        const userList = userSnapshot.docs.map(doc => doc.data() as CustomUser);
+        console.log(`[firebaseService] Firestore'dan ${userList.length} kullanıcı bulundu.`);
+        return userList;
+    } catch (error) {
+        console.error("[firebaseService] adminGetAllUsers HATA:", error);
+        return [];
+    }
 };
 
 export const adminUpdateUserProfile = async (userId: string, updates: { name: string; email: string }): Promise<CustomUser> => {
@@ -58,16 +73,25 @@ export const adminAdjustBalance = async (userId: string, amount: number): Promis
     if (!userSnap.exists()) throw new Error("User not found");
     const newBalance = (userSnap.data().balance || 0) + amount;
     const newTransaction: Transaction = {
-        id: `admin-adj-${Date.now()}`, date: new Date().toISOString(), type: 'Adjustment', asset: 'USD', symbol: 'USD', amountCoin: amount, amountUsd: amount, pricePerCoin: 1, status: 'Completed',
+        id: `admin-adj-${Date.now()}`,
+        date: new Date().toISOString(),
+        type: 'Adjustment',
+        asset: 'USD',
+        symbol: 'USD',
+        amountCoin: amount,
+        amountUsd: amount,
+        pricePerCoin: 1,
+        status: 'Completed',
     };
     await updateDoc(userRef, {
-        balance: newBalance, transactions: arrayUnion(newTransaction)
+        balance: newBalance,
+        transactions: arrayUnion(newTransaction)
     });
     const updatedUserSnap = await getDoc(userRef);
     return updatedUserSnap.data() as CustomUser;
 };
 
-export const adminAddHolding = async (userId: string, adjustment: { coinSymbol: string, amount: number, targetAddress: string }): Promise<CustomUser> => {
+export const adminAddHolding = async (userId: string, adjustment: { coinSymbol: string; amount: number; targetAddress: string }): Promise<CustomUser> => {
     const userRef = doc(db, "users", userId);
     const userSnap = await getDoc(userRef);
     if (!userSnap.exists()) throw new Error("User not found");
@@ -75,7 +99,16 @@ export const adminAddHolding = async (userId: string, adjustment: { coinSymbol: 
     const coinNameMap: { [key: string]: string } = { 'BTC': 'Bitcoin', 'ETH': 'Ethereum', 'SOL': 'Solana', 'ADA': 'Cardano' };
     const coinName = coinNameMap[adjustment.coinSymbol] || adjustment.coinSymbol;
     const newTransaction: Transaction = {
-        id: `admin-profit-${Date.now()}`, date: new Date().toISOString(), type: 'Mt Profit', asset: coinName, symbol: adjustment.coinSymbol, amountCoin: adjustment.amount, amountUsd: 0, pricePerCoin: 0, status: 'Completed', targetAddress: adjustment.targetAddress,
+        id: `admin-profit-${Date.now()}`,
+        date: new Date().toISOString(),
+        type: 'Mt Profit',
+        asset: coinName,
+        symbol: adjustment.coinSymbol,
+        amountCoin: adjustment.amount,
+        amountUsd: 0,
+        pricePerCoin: 0,
+        status: 'Completed',
+        targetAddress: adjustment.targetAddress,
     };
     let updatedHoldings = [...userData.holdings];
     const existingHoldingIndex = updatedHoldings.findIndex(h => h.symbol === adjustment.coinSymbol);
@@ -83,11 +116,15 @@ export const adminAddHolding = async (userId: string, adjustment: { coinSymbol: 
         updatedHoldings[existingHoldingIndex].amount += adjustment.amount;
     } else {
         updatedHoldings.push({
-            name: coinName, symbol: adjustment.coinSymbol, amount: adjustment.amount, valueUsd: 0,
+            name: coinName,
+            symbol: adjustment.coinSymbol,
+            amount: adjustment.amount,
+            valueUsd: 0,
         });
     }
     await updateDoc(userRef, {
-        holdings: updatedHoldings, transactions: arrayUnion(newTransaction)
+        holdings: updatedHoldings,
+        transactions: arrayUnion(newTransaction)
     });
     const updatedUserSnap = await getDoc(userRef);
     return updatedUserSnap.data() as CustomUser;
@@ -102,7 +139,6 @@ export const adminDeleteTransaction = async (userId: string, transaction: Transa
     return updatedUserSnap.data() as CustomUser;
 };
 
-// --- ADMİN DEPOZİT İŞLEMLERİ (YENİ EKLENEN KISIM) ---
 export const adminGetDepositRequests = async (): Promise<DepositRequest[]> => {
     const requestsCol = collection(db, "depositRequests");
     const requestSnapshot = await getDocs(requestsCol);
@@ -117,12 +153,21 @@ export const adminUpdateDepositStatus = async (requestId: string, userId: string
         if (!userSnap.exists()) throw new Error("User to update balance not found.");
         const newBalance = (userSnap.data().balance || 0) + amount;
         const newTransaction: Transaction = {
-            id: `dep-${requestId}`, date: new Date().toISOString(), type: 'Deposit', asset: 'USD', symbol: 'USD', amountCoin: amount, amountUsd: amount, pricePerCoin: 1, status: 'Completed',
+            id: `dep-${requestId}`,
+            date: new Date().toISOString(),
+            type: 'Deposit',
+            asset: 'USD',
+            symbol: 'USD',
+            amountCoin: amount,
+            amountUsd: amount,
+            pricePerCoin: 1,
+            status: 'Completed',
         };
         const batch = writeBatch(db);
         batch.update(requestRef, { status: status });
-        batch.update(userRef, { 
-            balance: newBalance, transactions: arrayUnion(newTransaction)
+        batch.update(userRef, {
+            balance: newBalance,
+            transactions: arrayUnion(newTransaction)
         });
         await batch.commit();
     } else {
