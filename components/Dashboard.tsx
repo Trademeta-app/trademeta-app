@@ -42,10 +42,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onUserUpdate, onShowDetail,
       try {
         setMarketError(null);
         const data = await getMarketData('usd', 250);
-        setMarketData(data);
+        
+        if (Array.isArray(data)) {
+            setMarketData(data);
+        } else {
+            console.error("CoinGecko'dan beklenen veri formatı (dizi) alınamadı. Gelen veri:", data);
+            throw new Error("Piyasa verileri hatalı formatta geldi.");
+        }
+
       } catch (error) {
-        console.error("Piyasa verileri alınırken hata oluştu (Dashboard):", error);
-        setMarketError("Piyasa verileri alınamadı. Lütfen bir süre sonra tekrar deneyin.");
+        console.error("Piyasa verileri çekilirken hata oluştu (Dashboard):", error);
+        setMarketError("Piyasa verileri şu anda alınamıyor. Lütfen daha sonra tekrar deneyin.");
+        setMarketData([]); // Hata durumunda market verisini boşalt
       } finally {
         setMarketIsLoading(false);
       }
@@ -54,7 +62,21 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onUserUpdate, onShowDetail,
   }, []);
 
   useEffect(() => {
-    if (marketData.length === 0) return;
+    const validMarketData = Array.isArray(marketData) && marketData.length > 0;
+
+    if (!validMarketData) {
+      const emptyHoldings = (user.holdings || []).map(h => ({
+        ...h, valueUsd: 0, currentPrice: 0, todaysChangePercent: 0, avgCost: 0, totalGainLoss: {amount: 0, percent: 0}
+      }));
+      setPortfolioMetrics({
+        totalPortfolioValue: user.balance,
+        totalHoldingsValue: 0,
+        changeAmount: 0,
+        changePercent: 0,
+        dynamicHoldings: emptyHoldings,
+      });
+      return;
+    }
 
     const calculatePortfolioMetrics = () => {
         if (!user.holdings || user.holdings.length === 0) {
