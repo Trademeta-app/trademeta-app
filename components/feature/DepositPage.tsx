@@ -1,42 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import Card from '../shared/Card.tsx';
 import { User } from '../../types.ts';
-import { createDepositRequest } from '../../services/mockDataService.ts';
+// DEĞİŞTİ: Gerçek Firebase servisini import ediyoruz
+import { createDepositRequestInFirestore } from '../../services/firebaseService.ts';
 import { DepositIcon } from '../shared/Icons.tsx';
 
 interface DepositPageProps {
     user: User;
-    onDepositRequest: (updatedUser: User) => void;
+    // Bu prop'a artık ihtiyacımız yok, çünkü işlem direkt veritabanına yazılıyor.
+    // onDepositRequest: (updatedUser: User) => void;
 }
 
-const DepositPage: React.FC<DepositPageProps> = ({ user, onDepositRequest }) => {
+const DepositPage: React.FC<DepositPageProps> = ({ user }) => {
     const [amount, setAmount] = useState('');
     const [method, setMethod] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [notification, setNotification] = useState<string | null>(null);
-
-    useEffect(() => {
-        // Simulate sending an email with deposit instructions when the page loads.
-        console.log(`
-            --- SIMULATED EMAIL ---
-            To: ${user.email}
-            Subject: Aetherium Trade - Investment Information
-            
-            Hello ${user.name},
-            
-            To make a deposit, please use the following details. After making the transfer,
-            submit the form on the deposit page to notify our administrators.
-            
-            Bank: Aetherium Global
-            Account: 123456789
-            SWIFT/BIC: AETGUS33
-            Reference: ${user.id}
-            
-            Thank you,
-            The Aetherium Trade Team
-            -----------------------
-        `);
-    }, [user.email, user.name, user.id]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -47,18 +26,20 @@ const DepositPage: React.FC<DepositPageProps> = ({ user, onDepositRequest }) => 
         }
 
         setIsLoading(true);
+        setNotification(null);
         try {
-            await createDepositRequest(user.id, user.name, depositAmount, method);
+            // DEĞİŞTİ: Mock servis yerine gerçek Firestore fonksiyonunu çağırıyoruz
+            await createDepositRequestInFirestore(user.id, user.name, depositAmount, method);
             setNotification('Your request has been received and is awaiting admin approval.');
             setAmount('');
             setMethod('');
         } catch (error) {
             setNotification('There was an error submitting your request. Please try again.');
+            console.error("Error creating deposit request:", error);
         } finally {
             setIsLoading(false);
         }
     };
-
 
     return (
         <div className="p-8 max-w-4xl mx-auto space-y-8">
