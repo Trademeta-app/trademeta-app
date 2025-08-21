@@ -9,7 +9,7 @@ export default async function handler(
   const { endpoint, ...queryParams } = req.query;
 
   if (!endpoint || typeof endpoint !== 'string') {
-    return res.status(400).json({ error: 'Endpoint query parameter is required and must be a string.' });
+    return res.status(400).json({ error: 'Endpoint query parameter is required.' });
   }
 
   const API_BASE_URL = 'https://api.coingecko.com/api/v3';
@@ -18,25 +18,29 @@ export default async function handler(
   try {
     const response = await axios.get(fullUrl, {
       params: queryParams,
-      // CoinGecko'nun bot olmadığımızı anlaması için bir User-Agent eklemek iyi bir pratiktir
       headers: {
-        'User-Agent': 'TrademetaApp/1.0.0'
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
       }
     });
+
+    // GELEN VERİYİ KONTROL ETME (EN ÖNEMLİ KISIM)
+    if (!response.data || (Array.isArray(response.data) && response.data.length === 0)) {
+        // CoinGecko boş ama başarılı bir cevap döndürürse, bunu bir sunucu hatası olarak logla
+        console.warn(`CoinGecko returned an empty but successful response for endpoint: ${endpoint}`);
+        // İstemciye yine de boş dizi gönderilebilir, ama loglama önemlidir.
+    }
     
-    // Vercel'in önbellekleme ayarları
     res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
-    
     res.status(200).json(response.data);
 
   } catch (error: any) {
-    // Hata ayıklama için hatayı sunucu loglarına yazdır
     console.error(`Error fetching from CoinGecko endpoint: ${endpoint}`, {
-      axiosError: error.message,
-      axiosResponse: error.response?.data
+      axiosErrorMessage: error.message,
+      axiosResponseStatus: error.response?.status,
+      axiosResponseData: error.response?.data
     });
 
-    // İstemciye daha anlamlı bir hata mesajı gönder
     const status = error.response?.status || 500;
     const message = error.response?.data?.error || 'Failed to fetch data from CoinGecko API';
     
