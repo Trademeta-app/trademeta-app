@@ -96,10 +96,10 @@ const UserManagementDetail: React.FC<UserManagementDetailProps> = ({ user, onBac
             setIsLoading(false);
         }
     };
-
+    
     const handlePasswordChange = async (e: React.FormEvent) => {
         e.preventDefault();
-        showNotification('error', "Şifre değiştirme şu anda mock servislerde desteklenmiyor.");
+        showNotification('error', "Password changes are handled by Firebase Authentication directly and cannot be done from this panel for security reasons.");
     };
 
     const handleBalanceAdjust = async (e: React.FormEvent) => {
@@ -188,14 +188,12 @@ const UserManagementDetail: React.FC<UserManagementDetailProps> = ({ user, onBac
                          <form onSubmit={handlePasswordChange} className="space-y-4">
                             <div>
                                 <label className="block text-sm text-muted mb-1">New Password</label>
-                                <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full bg-background border border-border-color rounded px-3 py-2" placeholder="Not implemented"/>
+                                <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full bg-background border border-border-color rounded px-3 py-2" placeholder="Not available in this panel"/>
                             </div>
                              <button type="submit" disabled={true} className="w-full bg-primary text-background font-bold py-2 rounded-md hover:bg-primary-focus opacity-50 cursor-not-allowed">Set New Password</button>
                         </form>
                     </Card>
-
                     <AddToPortfolioForm userId={user.id} onAdminAdjustment={onAdminAdjustment} showNotification={showNotification} />
-                    
                     <Card>
                         <h2 className="text-xl font-bold text-white mb-4">Balance Management</h2>
                          <form onSubmit={handleBalanceAdjust} className="space-y-4">
@@ -215,8 +213,18 @@ const UserManagementDetail: React.FC<UserManagementDetailProps> = ({ user, onBac
                              <table className="w-full text-left text-sm">
                                 <thead><tr className="border-b border-border-color"><th className="p-2 text-muted">Asset</th><th className="p-2 text-muted text-right">Amount</th><th className="p-2 text-muted text-right">Value (USD)</th></tr></thead>
                                 <tbody>
-                                    {user.holdings.map(h => <tr key={h.symbol}><td className="p-2 text-white">{h.name}</td><td className="p-2 text-right font-mono text-white">{h.amount.toFixed(6)}</td><td className="p-2 text-right font-mono text-white">${h.valueUsd.toFixed(2)}</td></tr>)}
-                                    {user.holdings.length === 0 && <tr><td colSpan={3} className="text-center p-4 text-muted">No holdings</td></tr>}
+                                    {Array.isArray(user.holdings) && user.holdings.map(h => (
+                                        <tr key={h.symbol}>
+                                            <td className="p-2 text-white">{h.name || 'N/A'}</td>
+                                            <td className="p-2 text-right font-mono text-white">
+                                                {typeof h.amount === 'number' ? h.amount.toFixed(6) : '-'}
+                                            </td>
+                                            <td className="p-2 text-right font-mono text-white">
+                                                {typeof h.valueUsd === 'number' ? `$${h.valueUsd.toFixed(2)}` : '$-'}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {(!user.holdings || user.holdings.length === 0) && <tr><td colSpan={3} className="text-center p-4 text-muted">No holdings</td></tr>}
                                 </tbody>
                             </table>
                         </div>
@@ -227,16 +235,20 @@ const UserManagementDetail: React.FC<UserManagementDetailProps> = ({ user, onBac
                              <table className="w-full text-left text-xs">
                                 <thead><tr className="border-b border-border-color"><th className="p-1 text-muted">Date</th><th className="p-1 text-muted">Type</th><th className="p-1 text-muted">Asset</th><th className="p-1 text-muted text-right">Amount (USD)</th><th className="p-1 text-muted text-right">Actions</th></tr></thead>
                                 <tbody>
-                                    {user.transactions.map(tx => <tr key={tx.id} className="border-b border-border-color last:border-0 hover:bg-surface/50">
-                                        <td className="p-1.5 text-muted">{new Date(tx.date).toLocaleString()}</td>
-                                        <td className="p-1.5">{getTypePill(tx.type)}</td>
-                                        <td className="p-1.5 text-white">{tx.asset}</td>
-                                        <td className="p-1.5 text-right font-mono text-white">${tx.amountUsd.toFixed(2)}</td>
-                                        <td className="p-1.5 text-right">
-                                            <button onClick={() => handleDeleteTransaction(tx)} className="text-danger hover:underline">Delete</button>
-                                        </td>
-                                    </tr>)}
-                                    {user.transactions.length === 0 && <tr><td colSpan={5} className="text-center p-4 text-muted">No transactions</td></tr>}
+                                    {Array.isArray(user.transactions) && user.transactions.map(tx => (
+                                        <tr key={tx.id} className="border-b border-border-color last:border-0 hover:bg-surface/50">
+                                            <td className="p-1.5 text-muted">{tx.date ? new Date(tx.date).toLocaleString() : '-'}</td>
+                                            <td className="p-1.5">{getTypePill(tx.type)}</td>
+                                            <td className="p-1.5 text-white">{tx.asset || 'N/A'}</td>
+                                            <td className="p-1.5 text-right font-mono text-white">
+                                                {typeof tx.amountUsd === 'number' ? `$${tx.amountUsd.toFixed(2)}` : '$-'}
+                                            </td>
+                                            <td className="p-1.5 text-right">
+                                                <button onClick={() => handleDeleteTransaction(tx)} className="text-danger hover:underline">Delete</button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {(!user.transactions || user.transactions.length === 0) && <tr><td colSpan={5} className="text-center p-4 text-muted">No transactions</td></tr>}
                                 </tbody>
                             </table>
                         </div>
