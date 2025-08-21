@@ -1,34 +1,45 @@
-
-
 import React, { useState, useEffect } from 'react';
 import Card from '../shared/Card.tsx';
 import { DepositRequest, DepositStatus } from '../../types.ts';
-import { mockDepositRequests, updateDepositStatus } from '../../services/mockDataService.ts';
+// DEĞİŞTİ: Gerçek Firebase servislerini import ediyoruz
+import { adminGetDepositRequests, adminUpdateDepositStatus } from '../../services/firebaseService.ts';
 
 const getStatusColor = (status: DepositStatus) => {
   switch (status) {
-    case DepositStatus.APPROVED:
-      return 'bg-success/20 text-success';
-    case DepositStatus.REJECTED:
-      return 'bg-danger/20 text-danger';
-    case DepositStatus.PENDING:
-      return 'bg-yellow-500/20 text-yellow-400';
-    default:
-      return 'bg-gray-500/20 text-gray-400';
+    case DepositStatus.APPROVED: return 'bg-success/20 text-success';
+    case DepositStatus.REJECTED: return 'bg-danger/20 text-danger';
+    case DepositStatus.PENDING: return 'bg-yellow-500/20 text-yellow-400';
+    default: return 'bg-gray-500/20 text-gray-400';
   }
 };
 
 const DepositRequests: React.FC = () => {
-    const [requests, setRequests] = useState<DepositRequest[]>(mockDepositRequests);
+    const [requests, setRequests] = useState<DepositRequest[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [loadingId, setLoadingId] = useState<string | null>(null);
 
-    const handleUpdate = async (id: string, status: DepositStatus.APPROVED | DepositStatus.REJECTED) => {
-        setLoadingId(id);
+    const fetchRequests = async () => {
+        setIsLoading(true);
         try {
-            await updateDepositStatus(id, status);
-            // The mockDepositRequests array is mutated by the service, so we create a new
-            // array reference to trigger a re-render.
-            setRequests([...mockDepositRequests]);
+            const allRequests = await adminGetDepositRequests();
+            setRequests(allRequests);
+        } catch (error) {
+            console.error("Failed to fetch deposit requests:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchRequests();
+    }, []);
+
+    const handleUpdate = async (req: DepositRequest, status: DepositStatus.APPROVED | DepositStatus.REJECTED) => {
+        setLoadingId(req.id);
+        try {
+            await adminUpdateDepositStatus(req.id, req.userId, req.amount, status);
+            // Başarılı güncelleme sonrası listeyi yenile
+            fetchRequests();
         } catch (error) {
             console.error(error);
             alert('Failed to update deposit status.');
@@ -58,24 +69,20 @@ const DepositRequests: React.FC = () => {
                                 <td className="p-3 text-white">{req.userName}</td>
                                 <td className="p-3 text-white">${req.amount.toLocaleString()}</td>
                                 <td className="p-3 text-white">{req.method}</td>
-                                <td className="p-3 text-muted">{req.date}</td>
+                                <td className="p-3 text-muted">{new Date(req.date).toLocaleString()}</td>
                                 <td className="p-3">
                                     <span className={`px-2 py-1 text-xs font-bold rounded-full ${getStatusColor(req.status)}`}>
                                         {req.status}
                                     </span>
                                  </td>
                                 <td className="p-3 text-right">
-                                    {req.status === DepositStatus.PENDING ? (
-                                        loadingId === req.id ? (
-                                            <div className="flex justify-end"><span className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin"></span></div>
-                                        ) : (
-                                            <div className="flex gap-2 justify-end">
-                                                <button onClick={() => handleUpdate(req.id, DepositStatus.APPROVED)} className="bg-success text-white px-3 py-1 text-sm rounded-md hover:bg-green-600 transition-colors">Approve</button>
-                                                <button onClick={() => handleUpdate(req.id, DepositStatus.REJECTED)} className="bg-danger text-white px-3 py-1 text-sm rounded-md hover:bg-red-600 transition-colors">Reject</button>
-                                            </div>
-                                        )
+                                    {loadingId === req.id ? (
+                                        <div className="flex justify-end"><span className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin"></span></div>
                                     ) : (
-                                        <span className="text-muted text-sm">Completed</span>
+                                        <div className="flex gap-2 justify-end">
+                                            <button onClick={() => handleUpdate(req, DepositStatus.APPROVED)} className="bg-success text-white px-3 py-1 text-sm rounded-md hover:bg-green-600 transition-colors">Approve</button>
+                                            <button onClick={() => handleUpdate(req, DepositStatus.REJECTED)} className="bg-danger text-white px-3 py-1 text-sm rounded-md hover:bg-red-600 transition-colors">Reject</button>
+                                        </div>
                                     )}
                                 </td>
                             </tr>
