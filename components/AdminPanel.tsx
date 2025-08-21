@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import DepositRequests from './admin/DepositRequests.tsx';
 import UserTable from './admin/UserTable.tsx';
 import UserManagementDetail from './admin/UserManagementDetail.tsx';
-import { getAdminAllUsers, adminAddHolding } from '../services/mockDataService.ts';
 import { User } from '../types.ts';
 import Card from './shared/Card.tsx';
 
