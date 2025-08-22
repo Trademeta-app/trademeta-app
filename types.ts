@@ -1,4 +1,3 @@
-
 export enum UserRole {
   USER = 'USER',
   ADMIN = 'ADMIN',
@@ -15,8 +14,7 @@ export enum DepositStatus {
   REJECTED = 'Rejected',
 }
 
-// --- CoinGecko API Tipleri ---
-// CoinGecko'nun /coins/markets endpoint'inden gelen veri yapısını tanımlar.
+// --- CoinGecko API Types ---
 export interface Coin {
   id: string;
   symbol: string;
@@ -49,7 +47,6 @@ export interface Coin {
   };
   last_updated: string;
 }
-// --- Bitiş: CoinGecko API Tipleri ---
 
 export interface CoinDetail extends Coin {
   description: {
@@ -59,13 +56,10 @@ export interface CoinDetail extends Coin {
     homepage: string[];
   };
   market_data: {
-    // current_price, market_cap vb. zaten Coin tipinde var
-    // ama burada daha fazlası da mevcut
     total_supply: number;
     max_supply: number;
     circulating_supply: number;
   };
-  // İhtiyacınız olabilecek diğer alanları da ekleyebilirsiniz
 }
 
 
@@ -77,6 +71,10 @@ export interface User {
   balance: number;
   holdings: Holding[];
   transactions: Transaction[];
+  // --- YENİ EKLENEN ALANLAR ---
+  dateOfBirth?: string;
+  gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
+  address?: string;
 }
 
 export interface DepositRequest {
@@ -92,10 +90,10 @@ export interface DepositRequest {
 export interface CryptoData {
   rank: number;
   name:string;
-  symbol: string; // e.g., BTC-USD.CC
+  symbol: string;
   price: number;
   previousPrice?: number;
-  change24h: number; // Percentage change
+  change24h: number;
   volume24h: number;
   marketCap: number;
   sparkline: number[];
@@ -116,7 +114,7 @@ export interface EodHistoricalData {
 }
 
 export interface EodRealTimeData {
-    code: string; // e.g., BTC-USD.CC
+    code: string;
     timestamp: number;
     gmtoffset: number;
     open: number;
@@ -140,9 +138,9 @@ export interface PriceDataPoint {
 }
 
 export interface Holding {
-    symbol: string; // e.g., BTC-USD.CC
+    symbol: string;
     name: string;
-    amount: number; // Number of coins/tokens
+    amount: number;
     valueUsd: number;
 }
 
@@ -163,9 +161,9 @@ export interface Transaction {
     id: string;
     date: string;
     type: TransactionType;
-    orderType?: OrderType; // Optional for deposits
-    asset: string; // e.g., Bitcoin
-    symbol: string; // e.g., BTC-USD.CC
+    orderType?: OrderType;
+    asset: string;
+    symbol: string;
     amountCoin: number;
     amountUsd: number;
     pricePerCoin: number;
@@ -185,7 +183,7 @@ export interface TechnicalSignal {
   };
   summary: {
     recommendation: 'Strong Buy' | 'Buy' | 'Hold' | 'Sell' | 'Strong Sell';
-    confidence: number; // 0 to 1
+    confidence: number;
     text: string;
   };
 }

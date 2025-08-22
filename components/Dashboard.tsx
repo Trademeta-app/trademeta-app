@@ -16,9 +16,11 @@ interface DashboardProps {
   onUserUpdate: (updatedUser: User) => void;
   onShowDetail: (coinId: string) => void;
   onGoToDeposit: () => void;
+  marketCurrentPage: number;
+  onMarketPageChange: (newPage: number) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ user, onUserUpdate, onShowDetail, onGoToDeposit }) => {
+const Dashboard: React.FC<DashboardProps> = ({ user, onUserUpdate, onShowDetail, onGoToDeposit, marketCurrentPage, onMarketPageChange }) => {
   const [selectedCoinId, setSelectedCoinId] = useState<string>('bitcoin');
   const [activeTab, setActiveTab] = useState<DashboardTab>('Market');
   const [watchlist, setWatchlist] = useState<string[]>(['bitcoin', 'ethereum', 'solana', 'cardano']);
@@ -42,18 +44,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onUserUpdate, onShowDetail,
       try {
         setMarketError(null);
         const data = await getMarketData('usd', 250);
-        
         if (Array.isArray(data)) {
             setMarketData(data);
         } else {
-            console.error("CoinGecko'dan beklenen veri formatı (dizi) alınamadı. Gelen veri:", data);
-            throw new Error("Piyasa verileri hatalı formatta geldi.");
+            throw new Error("Market data received in wrong format.");
         }
-
       } catch (error) {
-        console.error("Piyasa verileri çekilirken hata oluştu (Dashboard):", error);
-        setMarketError("Piyasa verileri şu anda alınamıyor. Lütfen daha sonra tekrar deneyin.");
-        setMarketData([]); // Hata durumunda market verisini boşalt
+        setMarketError("Could not fetch market data at this time.");
+        setMarketData([]);
       } finally {
         setMarketIsLoading(false);
       }
@@ -147,9 +145,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onUserUpdate, onShowDetail,
       onUserUpdate(updatedUser);
   }
 
-  const handleGoToTrade = (coinId: string) => {
-    setSelectedCoinId(coinId);
-    setActiveTab('Trade');
+  const handleGoToTrade = (symbolOrId: string) => {
+      const coin = marketData.find(c => c.id === symbolOrId || c.symbol.toLowerCase() === symbolOrId.toLowerCase());
+      if (coin) {
+          setSelectedCoinId(coin.id);
+          setActiveTab('Trade');
+      } else {
+          alert(`Could not find market data for ${symbolOrId}.`);
+      }
   };
   
   const TabButton = ({ tabName }: { tabName: DashboardTab }) => (
@@ -157,6 +160,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onUserUpdate, onShowDetail,
         {tabName}
     </button>
   );
+
+  const watchlistData = marketData.filter(coin => watchlist.includes(coin.id));
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -168,7 +173,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onUserUpdate, onShowDetail,
               onGoToTrade={handleGoToTrade} 
               onShowDetail={onShowDetail} 
               watchlist={watchlist} 
-              onToggleWatchlist={handleToggleWatchlist} 
+              onToggleWatchlist={handleToggleWatchlist}
+              currentPage={marketCurrentPage}
+              onPageChange={onMarketPageChange}
             />;
         case 'Portfolio':
             return (
@@ -199,7 +206,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onUserUpdate, onShowDetail,
             {renderTabContent()}
         </div>
         <div className="lg:col-span-1">
-            <Watchlist watchlistSymbols={watchlist} onToggleWatchlist={handleToggleWatchlist} />
+            <Watchlist 
+                coins={watchlistData} 
+                isLoading={marketIsLoading}
+                onToggleWatchlist={handleToggleWatchlist} 
+                onGoToTrade={handleGoToTrade}
+                onShowDetail={onShowDetail}
+            />
         </div>
       </div>
     </div>

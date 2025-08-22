@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react'; // useState'i sildik
 import { Coin } from '../../types.ts';
 import { StarIcon } from '../shared/Icons.tsx';
-import Card from '../shared/Card.tsx'; // Card importunu ekledim
+import Card from '../shared/Card.tsx';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -13,6 +13,9 @@ interface MarketProps {
     onShowDetail: (id: string) => void;
     watchlist: string[];
     onToggleWatchlist: (id: string) => void;
+    // YENİ PROPLAR: Sayfa durumunu dışarıdan alıyoruz
+    currentPage: number;
+    onPageChange: (newPage: number) => void;
 }
 
 const formatLargeNumber = (num?: number): string => {
@@ -23,10 +26,9 @@ const formatLargeNumber = (num?: number): string => {
     return `$${num.toLocaleString()}`;
 };
 
-const Market: React.FC<MarketProps> = ({ coins, isLoading, error, onGoToTrade, onShowDetail, watchlist, onToggleWatchlist }) => {
-    const [currentPage, setCurrentPage] = useState(1);
+const Market: React.FC<MarketProps> = ({ coins, isLoading, error, onGoToTrade, onShowDetail, watchlist, onToggleWatchlist, currentPage, onPageChange }) => {
+    // const [currentPage, setCurrentPage] = useState(1); // BU SATIRI SİLDİK
     
-    // GÜVENLİK KONTROLÜ: Gelen 'coins' verisinin bir dizi olduğundan emin oluyoruz.
     const validCoins = Array.isArray(coins) ? coins : [];
 
     const totalPages = validCoins.length > 0 ? Math.ceil(validCoins.length / ITEMS_PER_PAGE) : 1;
@@ -35,8 +37,9 @@ const Market: React.FC<MarketProps> = ({ coins, isLoading, error, onGoToTrade, o
         currentPage * ITEMS_PER_PAGE
     );
 
-    const handleNextPage = () => { if (currentPage < totalPages) setCurrentPage(currentPage + 1); };
-    const handlePrevPage = () => { if (currentPage > 1) setCurrentPage(currentPage - 1); };
+    // Fonksiyonları onPageChange prop'unu kullanacak şekilde güncelledik
+    const handleNextPage = () => { if (currentPage < totalPages) onPageChange(currentPage + 1); };
+    const handlePrevPage = () => { if (currentPage > 1) onPageChange(currentPage - 1); };
     
     if (isLoading) {
         return (
@@ -58,12 +61,12 @@ const Market: React.FC<MarketProps> = ({ coins, isLoading, error, onGoToTrade, o
         <Card>
             <div className="p-6 flex justify-between items-center flex-wrap gap-4 border-b border-border-color">
                 <div>
-                    <h2 className="text-xl font-bold text-white">{validCoins.length} Kripto Para</h2>
-                    <p className="text-sm text-muted">Sayfa {currentPage} / {totalPages}</p>
+                    <h2 className="text-xl font-bold text-white">{validCoins.length} Cryptocurrencies</h2>
+                    <p className="text-sm text-muted">Page {currentPage} / {totalPages}</p>
                 </div>
                  <div className="flex gap-2">
-                    <button onClick={handlePrevPage} disabled={currentPage === 1} className="px-4 py-2 bg-background border border-border-color text-sm font-semibold text-white rounded-md transition-colors hover:bg-border-color disabled:opacity-50 disabled:cursor-not-allowed">Önceki</button>
-                    <button onClick={handleNextPage} disabled={currentPage === totalPages} className="px-4 py-2 bg-background border border-border-color text-sm font-semibold text-white rounded-md transition-colors hover:bg-border-color disabled:opacity-50 disabled:cursor-not-allowed">Sonraki</button>
+                    <button onClick={handlePrevPage} disabled={currentPage === 1} className="px-4 py-2 bg-background border border-border-color text-sm font-semibold text-white rounded-md transition-colors hover:bg-border-color disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
+                    <button onClick={handleNextPage} disabled={currentPage === totalPages} className="px-4 py-2 bg-background border border-border-color text-sm font-semibold text-white rounded-md transition-colors hover:bg-border-color disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
                 </div>
             </div>
             <div className="overflow-x-auto">
@@ -72,17 +75,16 @@ const Market: React.FC<MarketProps> = ({ coins, isLoading, error, onGoToTrade, o
                         <tr>
                             <th className="p-3 text-sm font-semibold text-muted text-center w-12"><StarIcon className="w-4 h-4 inline-block"/></th>
                             <th className="p-3 text-sm font-semibold text-muted">#</th>
-                            <th className="p-3 text-sm font-semibold text-muted">İsim</th>
-                            <th className="p-3 text-sm font-semibold text-muted text-right">Fiyat</th>
-                            <th className="p-3 text-sm font-semibold text-muted text-right">24s %</th>
-                            <th className="p-3 text-sm font-semibold text-muted text-right">Piyasa Değeri</th>
-                            <th className="p-3 text-sm font-semibold text-muted text-right">Hacim (24s)</th>
-                            <th className="p-3 text-sm font-semibold text-muted text-center">İşlem</th>
+                            <th className="p-3 text-sm font-semibold text-muted">Name</th>
+                            <th className="p-3 text-sm font-semibold text-muted text-right">Price</th>
+                            <th className="p-3 text-sm font-semibold text-muted text-right">24h %</th>
+                            <th className="p-3 text-sm font-semibold text-muted text-right">Market Cap</th>
+                            <th className="p-3 text-sm font-semibold text-muted text-right">Volume (24h)</th>
+                            <th className="p-3 text-sm font-semibold text-muted text-center">Trade</th>
                         </tr>
                     </thead>
                     <tbody>
                         {paginatedData.map(coin => {
-                            // GÜVENLİK KONTROLÜ: Değerlerin var olup olmadığını kontrol ederek varsayılan değerler atıyoruz.
                             const change24h = coin?.price_change_percentage_24h ?? 0;
                             const isPositive = change24h >= 0;
                             const isInWatchlist = watchlist.includes(coin?.id);

@@ -21,20 +21,39 @@ const App: React.FC = () => {
   const [activeRole, setActiveRole] = useState<UserRole>(UserRole.USER);
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
   const [detailCoinId, setDetailCoinId] = useState<string | null>(null);
+  const [marketPage, setMarketPage] = useState(1);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-      setFirebaseUser(fbUser);
       if (fbUser) {
+        // --- YENİ VE GÜÇLENDİRİLMİŞ KONTROL MANTIĞI ---
+        // Profilini çekmeden ÖNCE e-postasının doğrulanıp doğrulanmadığını kontrol et.
+        if (!fbUser.emailVerified) {
+          // Eğer doğrulanmamışsa, içeri almadan direkt çıkış yaptır ve işlemi sonlandır.
+          // Bu, "Dashboard'un anlık görünmesi" sorununu çözer.
+          await signOut(auth);
+          setFirebaseUser(null);
+          setUser(null);
+          setIsLoading(false);
+          return; // Fonksiyonun devam etmesini engelle
+        }
+        
+        // E-posta doğrulanmışsa, devam et ve profilini yükle.
+        setFirebaseUser(fbUser);
         const userProfile = await getUserProfile(fbUser.uid);
         if (userProfile) {
             setUser(userProfile);
             setActiveRole(userProfile.role);
             setActiveView(userProfile.role === UserRole.ADMIN ? 'admin' : 'dashboard');
         } else {
+            // Firestore'da profili yoksa (nadir bir durum), çıkış yaptır.
+            await signOut(auth);
             setUser(null);
         }
+
       } else {
+        // Oturum açmış bir kullanıcı yoksa, tüm state'leri temizle.
+        setFirebaseUser(null);
         setUser(null);
       }
       setIsLoading(false);
@@ -43,24 +62,22 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  const handleLogout = async () => {
+   const handleLogout = async () => {
     try {
       await signOut(auth);
-      setActiveRole(UserRole.USER);
-      setActiveView('dashboard');
     } catch (error) {
       console.error("Logout error", error);
     }
   };
   
-  const handleUserUpdate = async (updatedUser: CustomUser) => {
+  const handleUserUpdate = async (updatedData: Partial<CustomUser>) => {
+      if (!user || !firebaseUser) return;
+      const updatedUser = { ...user, ...updatedData };
       setUser(updatedUser);
-      if (firebaseUser) {
-          try {
-              await updateUserInFirestore(firebaseUser.uid, updatedUser);
-          } catch (error) {
-              console.error("Kullanıcı verisi Firestore'a kaydedilirken hata oluştu:", error);
-          }
+      try {
+          await updateUserInFirestore(firebaseUser.uid, updatedData);
+      } catch (error) {
+          console.error("Error saving user data to Firestore:", error);
       }
   }
   
@@ -92,34 +109,27 @@ const App: React.FC = () => {
         <h1 className="text-xl font-bold text-white">Trademeta</h1>
       </div>
       <div className="flex items-center gap-4">
-        {user?.role === UserRole.ADMIN && activeRole === UserRole.USER && (
+        {user?.role === UserRole.ADMIN && (
           <div className="flex items-center gap-2 p-1 bg-background rounded-lg">
-            <button onClick={() => handleRoleChange(UserRole.USER)} className="px-3 py-1.5 text-sm font-semibold rounded-md flex items-center gap-2 bg-primary text-background">
-                <DashboardIcon className="w-4 h-4" /> User View
+            <button onClick={() => handleRoleChange(UserRole.USER)} className={`px-3 py-1.5 text-sm font-semibold rounded-md flex items-center gap-2 ${activeRole === UserRole.USER ? 'bg-primary text-background' : 'text-muted hover:bg-border-color'}`}>
+                <DashboardIcon className="w-4 h-4" /> User
             </button>
-            <button onClick={() => handleRoleChange(UserRole.ADMIN)} className="px-3 py-1.5 text-sm font-semibold rounded-md flex items-center gap-2 text-muted hover:bg-border-color">
-                <AdminIcon className="w-4 h-4" /> Admin View
+            <button onClick={() => handleRoleChange(UserRole.ADMIN)} className={`px-3 py-1.5 text-sm font-semibold rounded-md flex items-center gap-2 ${activeRole === UserRole.ADMIN ? 'bg-primary text-background' : 'text-muted hover:bg-border-color'}`}>
+                <AdminIcon className="w-4 h-4" /> Admin
             </button>
           </div>
         )}
         
-        {activeRole === UserRole.USER && (
-          <div className="flex items-center gap-2 border-l border-border-color pl-4 ml-2">
-            <NavButton view="dashboard" icon={<DashboardIcon className="w-5 h-5" />} label="Dashboard" />
-            <NavButton view="deposit" icon={<DepositIcon className="w-5 h-5" />} label="Deposit" />
-            <NavButton view="profile" icon={<UserIcon className="w-5 h-5" />} label="User Profile" />
+        <div className="flex items-center gap-2 border-l border-border-color pl-4 ml-2">
+            {activeRole === UserRole.USER && (
+                <>
+                    <NavButton view="dashboard" icon={<DashboardIcon className="w-5 h-5" />} label="Dashboard" />
+                    <NavButton view="deposit" icon={<DepositIcon className="w-5 h-5" />} label="Deposit" />
+                    <NavButton view="profile" icon={<UserIcon className="w-5 h-5" />} label="User Profile" />
+                </>
+            )}
             <button onClick={handleLogout} className="p-2 rounded-full text-muted hover:bg-surface" aria-label="Logout"><LogoutIcon className="w-5 h-5" /></button>
-          </div>
-        )}
-
-        {activeRole === UserRole.ADMIN && (
-             <div className="flex items-center gap-2">
-                <span className="text-sm text-white font-semibold">Admin Panel</span>
-                <div className="border-l border-border-color pl-4 ml-2">
-                     <button onClick={handleLogout} className="p-2 rounded-full text-muted hover:bg-surface" aria-label="Logout"><LogoutIcon className="w-5 h-5" /></button>
-                </div>
-             </div>
-        )}
+        </div>
       </div>
     </header>
   );
@@ -132,36 +142,37 @@ const App: React.FC = () => {
       )
   }
 
-  if (!firebaseUser) {
+  if (!firebaseUser || !user) {
     return <AuthPage />;
   }
-
-  if (!user) {
-       return (
-          <div className="flex justify-center items-center h-screen bg-background">
-              <p className="text-danger">Kullanıcı verileri yüklenemedi. Lütfen tekrar giriş yapmayı deneyin.</p>
-          </div>
-      )
-  }
-
+  
   const renderContent = () => {
+      const dashboardProps = {
+        user: user,
+        onUserUpdate: handleUserUpdate,
+        onShowDetail: handleShowDetail,
+        onGoToDeposit: () => setActiveView('deposit'),
+        marketCurrentPage: marketPage,
+        onMarketPageChange: setMarketPage
+      };
+
       if (activeView === 'coinDetail' && detailCoinId) {
           return <CoinDetailPage coinId={detailCoinId} onBack={handleBackToDashboard} />;
       }
       
+      if (activeRole === UserRole.ADMIN) {
+        return <AdminPanel />;
+      }
+      
       switch (activeView) {
           case 'dashboard': 
-              return <Dashboard user={user} onUserUpdate={handleUserUpdate} onShowDetail={handleShowDetail} onGoToDeposit={() => setActiveView('deposit')} />;
-          case 'admin': 
-              return user.role === UserRole.ADMIN 
-                  ? <AdminPanel currentUser={user} onUserUpdate={handleUserUpdate} /> 
-                  : <Dashboard user={user} onUserUpdate={handleUserUpdate} onShowDetail={handleShowDetail} onGoToDeposit={() => setActiveView('deposit')} />;
+              return <Dashboard {...dashboardProps} />;
           case 'profile': 
               return <UserProfile user={user} onUpdateUser={handleUserUpdate} />;
           case 'deposit': 
-              return <DepositPage user={user} onDepositRequest={handleUserUpdate} />;
+              return <DepositPage user={user} />;
           default: 
-              return <Dashboard user={user} onUserUpdate={handleUserUpdate} onShowDetail={handleShowDetail} onGoToDeposit={() => setActiveView('deposit')} />;
+              return <Dashboard {...dashboardProps} />;
       }
   }
 

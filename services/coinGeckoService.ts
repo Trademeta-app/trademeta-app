@@ -1,20 +1,18 @@
+// src/services/coinGeckoService.ts (YENİ, DOĞRU HALİ)
 import axios from 'axios';
-import { Coin, CoinDetail, PriceDataPoint } from '../types'; 
+import { Coin, CoinDetail, PriceDataPoint } from '../types';
 
-const getApiBaseUrl = () => {
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
-  }
-  return '';
-};
+// Vite'nin doğru ortam değişkeni okuma yöntemi budur.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-const API_PROXY_ENDPOINT = `${getApiBaseUrl()}/api/proxy`;
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+});
 
 export const getMarketData = async (currency: string = 'usd', perPage: number = 100): Promise<Coin[]> => {
   try {
-    const response = await axios.get<Coin[]>(API_PROXY_ENDPOINT, {
+    const response = await apiClient.get<Coin[]>('/coins/markets', {
       params: {
-        endpoint: '/coins/markets',
         vs_currency: currency,
         order: 'market_cap_desc',
         per_page: perPage,
@@ -24,58 +22,49 @@ export const getMarketData = async (currency: string = 'usd', perPage: number = 
     });
     return response.data;
   } catch (error) {
-    console.error("API proxy'sinden piyasa verileri alınırken hata oluştu:", error);
-    throw new Error('Piyasa verileri alınamadı.');
+    console.error("Piyasa verileri alınırken hata oluştu (Bu aşamada normaldir):", error);
+    // Hata durumunda uygulama çökmesin diye boş bir dizi döndürüyoruz.
+    return [];
   }
 };
 
+// Diğer fonksiyonlarınız aynı kalabilir, sadece API çağrılarını apiClient üzerinden yapacak şekilde güncelliyoruz.
 export const getCoinDetails = async (coinId: string): Promise<CoinDetail> => {
-  try {
-    const response = await axios.get<CoinDetail>(API_PROXY_ENDPOINT, {
-      params: {
-        endpoint: `/coins/${coinId}`,
-        localization: false,
-        tickers: false,
-        market_data: true,
-        community_data: false,
-        developer_data: false,
-        sparkline: false,
-      }
-    });
-    return response.data;
-  } catch (error) {
-    console.error(`'${coinId}' için API proxy'sinden detay verileri alınırken hata oluştu:`, error);
-    throw new Error('Coin detayları alınamadı.');
-  }
+    try {
+        const response = await apiClient.get<CoinDetail>(`/coins/${coinId}`);
+        return response.data;
+    } catch (error) {
+        console.error(`'${coinId}' için detay verileri alınırken hata oluştu:`, error);
+        throw new Error('Coin detayları alınamadı.');
+    }
 };
 
 export const getCoinChartData = async (
-  coinId: string, 
-  currency: string = 'usd', 
-  days: string = '30'
+    coinId: string,
+    currency: string = 'usd',
+    days: string = '30'
 ): Promise<PriceDataPoint[]> => {
-  try {
-    const response = await axios.get<number[][]>(API_PROXY_ENDPOINT, {
-      params: {
-        endpoint: `/coins/${coinId}/ohlc`,
-        vs_currency: currency,
-        days: days,
-      },
-    });
-    
-    const formattedData: PriceDataPoint[] = response.data.map((item: number[]) => ({
-      date: new Date(item[0]).toISOString(),
-      open: item[1],
-      high: item[2],
-      low: item[3],
-      close: item[4],
-      price: item[4],
-      volume: 0, 
-    }));
-    
-    return formattedData;
-  } catch (error) {
-    console.error(`'${coinId}' için API proxy'sinden grafik verileri alınırken hata oluştu:`, error);
-    throw new Error('Grafik verileri alınamadı.');
-  }
+    try {
+        const response = await apiClient.get<number[][]>(`/coins/${coinId}/ohlc`, {
+            params: {
+                vs_currency: currency,
+                days: days,
+            },
+        });
+
+        const formattedData: PriceDataPoint[] = response.data.map((item: number[]) => ({
+            date: new Date(item[0]).toISOString(),
+            open: item[1],
+            high: item[2],
+            low: item[3],
+            close: item[4],
+            price: item[4],
+            volume: 0,
+        }));
+
+        return formattedData;
+    } catch (error) {
+        console.error(`'${coinId}' için grafik verileri alınırken hata oluştu:`, error);
+        throw new Error('Grafik verileri alınamadı.');
+    }
 };

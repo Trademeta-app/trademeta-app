@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { User } from '../types.ts';
-import { adminGetAllUsers, adminAddHolding } from '../services/firebaseService.ts';
-import UserTable from './admin/UserTable.tsx';
-import UserManagementDetail from './admin/UserManagementDetail.tsx';
-import Card from './shared/Card.tsx';
-import DepositRequests from './admin/DepositRequests.tsx';
+import { User } from '../types';
+import { adminGetAllUsers, adminAddHolding } from '../services/firebaseService';
+import UserTable from './admin/UserTable';
+import UserManagementDetail from './admin/UserManagementDetail';
+import Card from './shared/Card';
+import DepositRequests from './admin/DepositRequests';
 
 interface AdminPanelProps {
     currentUser: User | null;
-    onUserUpdate: (updatedUser: User) => void;
 }
 
 const StatCard = ({ title, value }: { title: string, value: string | number }) => (
@@ -18,27 +17,27 @@ const StatCard = ({ title, value }: { title: string, value: string | number }) =
     </Card>
 );
 
-const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onUserUpdate }) => {
+const AdminPanel: React.FC<AdminPanelProps> = () => {
     const [users, setUsers] = useState<User[]>([]);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     
-    const pendingRequests = 0;
+    // Bu state, DepositRequests bileşeninden gelen bilgiyle güncellenebilir.
+    const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+
+    const fetchUsers = async () => {
+        setIsLoading(true);
+        try {
+            const allUsers = await adminGetAllUsers();
+            setUsers(allUsers);
+        } catch (error) {
+            console.error("Failed to fetch users for admin panel:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchUsers = async () => {
-            console.log("[AdminPanel] useEffect tetiklendi, kullanıcılar çekiliyor...");
-            setIsLoading(true);
-            try {
-                const allUsers = await adminGetAllUsers();
-                console.log("[AdminPanel] adminGetAllUsers'dan dönen veri:", allUsers);
-                setUsers(allUsers);
-            } catch (error) {
-                console.error("Admin paneli için kullanıcılar çekilirken hata oluştu:", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
         fetchUsers();
     }, []);
 
@@ -48,45 +47,33 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onUserUpdate }) =>
 
     const handleBackToList = () => {
         setSelectedUser(null);
+        // Detaydan listeye dönüldüğünde kullanıcı listesini yenile
+        fetchUsers(); 
     };
 
-    const handleAdminAdjustment = async (userId: string, adjustment: { coinSymbol: string, amount: number, targetAddress: string }): Promise<User | void> => {
-        try {
-            const updatedUser = await adminAddHolding(userId, adjustment);
-            setUsers(prevUsers => prevUsers.map(u => u.id === userId ? updatedUser : u));
-            if (selectedUser?.id === userId) {
-                setSelectedUser(updatedUser);
-            }
-            if (currentUser && updatedUser.id === currentUser.id) {
-                onUserUpdate(updatedUser);
-            }
-            return updatedUser;
-        } catch (error) {
-            console.error("AdminPanel'de admin ayarlaması başarısız oldu:", error);
-            throw error;
-        }
-    };
-
-    const handleGenericUserUpdate = (updatedUser: User) => {
+    // Bu fonksiyon, herhangi bir alt bileşenden gelen güncellenmiş kullanıcı
+    // bilgisini alıp ana state'i günceller.
+    const handleUserUpdateInPanel = (updatedUser: User) => {
         setUsers(prevUsers => prevUsers.map(u => u.id === updatedUser.id ? updatedUser : u));
         if (selectedUser?.id === updatedUser.id) {
             setSelectedUser(updatedUser);
         }
-        if (currentUser && updatedUser.id === currentUser.id) {
-            onUserUpdate(updatedUser);
-        }
     };
 
     if (isLoading) {
-        return <div className="p-8 text-center text-white">Loading Admin Panel...</div>;
+        return (
+            <div className="p-8 text-center">
+                <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+                <p className="mt-4 text-muted">Loading Admin Panel...</p>
+            </div>
+        );
     }
 
     if (selectedUser) {
         return <UserManagementDetail 
                     user={selectedUser} 
                     onBack={handleBackToList} 
-                    onAdminAdjustment={handleAdminAdjustment} 
-                    onUserUpdate={handleGenericUserUpdate} 
+                    onUserUpdate={handleUserUpdateInPanel} 
                 />;
     }
 
@@ -99,12 +86,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onUserUpdate }) =>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <StatCard title="Total Users" value={users.length} />
-                <StatCard title="Pending Deposit Requests" value={pendingRequests} />
-                <StatCard title="Recent Transactions (24h)" value="0" />
+                <StatCard title="Pending Deposit Requests" value={pendingRequestsCount} />
+                <StatCard title="Recent Transactions (24h)" value="N/A" />
             </div>
 
             <div className="space-y-8">
-                <DepositRequests />
+                {/* DepositRequests'e bir callback prop'u ekleyerek bekleyen istek sayısını alabiliriz */}
+                <DepositRequests onPendingCountChange={setPendingRequestsCount} />
                 <UserTable users={users} onSelectUser={handleSelectUser} />
             </div>
         </div>
